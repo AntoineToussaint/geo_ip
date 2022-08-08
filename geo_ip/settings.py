@@ -66,6 +66,15 @@ class Settings(BaseSettings):
             path=path,
         )
 
+    @property
+    def fetchers(self):
+        """Fetcher and rate limiting per minute."""
+        # TODO load from config or dynamic store
+        return [
+            ("ipwhois", {"rate_limit": 5}),
+            ("dummy", {"rate_limit": 5, "API_KEY": "something"}),
+        ]
+
     class Config:
         env_file = ".env"
         env_prefix = "GEO_IP_"

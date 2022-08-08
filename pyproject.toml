@@ -19,6 +19,7 @@ yarl = "^1.7.2"
 ujson = "^5.1.0"
 redis = {version = "^4.3.3", extras = ["hiredis"]}
 httptools = "^0.3.0"
+requests = "^2.28.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0"

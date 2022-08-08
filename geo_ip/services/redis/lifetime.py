@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from redis.asyncio import ConnectionPool
+from redis import ConnectionPool
 
 from geo_ip.settings import settings
 
@@ -15,10 +15,10 @@ def init_redis(app: FastAPI) -> None:  # pragma: no cover
     )
 
 
-async def shutdown_redis(app: FastAPI) -> None:  # pragma: no cover
+def shutdown_redis(app: FastAPI) -> None:  # pragma: no cover
     """
     Closes redis connection pool.
 
     :param app: current FastAPI app.
     """
-    await app.state.redis_pool.disconnect()
+    app.state.redis_pool.disconnect()
