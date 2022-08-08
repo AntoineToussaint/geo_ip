@@ -7,10 +7,8 @@ We implement it with a window in minute to make it easier to test locally but lo
 Note, this is not exactly a rate limited per hour as we use fixed buckets, but it makes the implementation much simpler
 """
 import datetime
-
+from typing import List
 import redis
-
-_connection = None
 
 
 def calc_key(name: str, t: datetime.datetime) -> str:
@@ -25,21 +23,32 @@ class RedisRateLimiter:
     def add_limit(self, name: str, limit: int) -> None:
         self.limits[name] = limit
 
-    def available(self, pool: redis.ConnectionPool, name: str) -> bool:
-        conn = redis.Redis(connection_pool=pool)
-        # We get the current hour/minute
-        now = datetime.datetime.utcnow()
-        key = calc_key(name, now)
-        counter = conn.get(key)
-        return counter is None or int(counter) <= self.limits[name]
+    def all_available(self, pool: redis.ConnectionPool) -> List[str]:
+        return [name for name in self.limits.keys() if self.available(pool, name)]
 
-    def increment(self, pool: redis.ConnectionPool, name:str) -> None:
+    def available(self, pool: redis.ConnectionPool, name: str) -> bool:
+        # TODO also do local for debugging
+        try:
+            conn = redis.Redis(connection_pool=pool)
+            # We get the current hour/minute
+            now = datetime.datetime.utcnow()
+            key = calc_key(name, now)
+            counter = conn.get(key)
+            return counter is None or int(counter) <= self.limits[name]
+        except redis.exceptions.ConnectionError:
+            return True
+
+    def increment(self, pool: redis.ConnectionPool, name: str) -> None:
         # only increment if we have a limit
         if name not in self.limits:
             return
-        conn = redis.Redis(connection_pool=pool)
-        # We get the current hour/minute
-        now = datetime.datetime.utcnow()
-        key = calc_key(name, now)
-        conn.incr(key)
-        conn.expire(key, 60)
+        # TODO also do local for debugging
+        try:
+            conn = redis.Redis(connection_pool=pool)
+            # We get the current hour/minute
+            now = datetime.datetime.utcnow()
+            key = calc_key(name, now)
+            conn.incr(key)
+            conn.expire(key, 60)
+        except redis.exceptions.ConnectionError:
+            pass

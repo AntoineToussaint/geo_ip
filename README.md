@@ -1,8 +1,24 @@
 # geo_ip
 
-This project was generated using fastapi_template.
+I wanted to get most of the boilerplate out of the way, so I used:
 
-## Poetry
+https://github.com/s3rius/FastAPI-template
+
+The difficult part of the project is that we want the rate limiter to be global, so we can replicate the servers but have a correct rate limit overall.
+
+I decided to use redis for rate limiting.
+
+https://redis.com/redis-best-practices/basic-rate-limiting/
+
+For testing, I use minutes rather than hours but changes can be made easily.
+
+Cache relies on in-memory first then redis as well.
+
+Having `docker-compose` make it easy to start two (or more) replicas of the server and redis to test it out.
+
+## Local deployment
+
+This will **NOT** use the rate limiter as I only implemented the global version that is using redis.
 
 This project uses poetry. It's a modern dependency management
 tool.
@@ -20,7 +36,9 @@ You can find swagger documentation at `/api/docs`.
 
 You can read more about poetry here: https://python-poetry.org/
 
-## Docker
+## Docker Compose
+
+This is recommended way to test the functionality as it will use proper caching and rate limiting.
 
 You can start the project with docker using this command:
 
@@ -35,7 +53,7 @@ Like this:
 docker-compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml --project-directory . up
 ```
 
-This command exposes the web application on port 8000, mounts current directory and enables autoreload.
+This command exposes the web application on port 4001, mounts current directory and enables autoreload.
 
 But you have to rebuild image every time you modify `poetry.lock` or `pyproject.toml` with this command:
 
@@ -43,23 +61,10 @@ But you have to rebuild image every time you modify `poetry.lock` or `pyproject.
 docker-compose -f deploy/docker-compose.yml --project-directory . build
 ```
 
-## Project structure
+To test it, open `http://0.0.0.0:4001/api/geo_ip/70.23.35.53` in your browser. Note that `meta` will contain the source of the data (service, if it was cached and what server received the request).
 
-```bash
-$ tree "geo_ip"
-geo_ip
-├── conftest.py  # Fixtures for all tests.
-├── __main__.py  # Startup script. Starts uvicorn.
-├── services  # Package for different external services such as rabbit or redis etc.
-├── settings.py  # Main configuration settings for project.
-├── static  # Static content.
-├── tests  # Tests for project.
-└── web  # Package contains web server. Handlers, startup config.
-    ├── api  # Package with all handlers.
-    │   └── router.py  # Main router.
-    ├── application.py  # FastAPI application configuration.
-    └── lifetime.py  # Contains actions to perform on startup and shutdown.
-```
+Rate limiting is set at 5 per minute and cache expires after 2 minutes but could easily be configured.
+
 
 ## Configuration
 
@@ -68,14 +73,14 @@ This application can be configured with environment variables.
 You can create `.env` file in the root directory and place all
 environment variables here.
 
-All environment variabels should start with "GEO_IP_" prefix.
+All environment variables should start with "GEO_IP_" prefix.
 
 For example if you see in your "geo_ip/settings.py" a variable named like
 `random_parameter`, you should provide the "GEO_IP_RANDOM_PARAMETER"
 variable to configure the value. This behaviour can be changed by overriding `env_prefix` property
 in `geo_ip.settings.Settings.Config`.
 
-An exmaple of .env file:
+An example of .env file:
 ```bash
 GEO_IP_RELOAD="True"
 GEO_IP_PORT="8000"
@@ -84,40 +89,12 @@ GEO_IP_ENVIRONMENT="dev"
 
 You can read more about BaseSettings class here: https://pydantic-docs.helpmanual.io/usage/settings/
 
-## Pre-commit
+## Testing
 
-To install pre-commit simply run inside the shell:
-```bash
-pre-commit install
-```
+I spent already quite a lot of time getting this to work with docker-compose, redis and fastapi (which I was not really familiar with but wanted to have fun -- the annoying part was how to get the redis connection pool).
 
-pre-commit is very useful to check your code before publishing it.
-It's configured using .pre-commit-config.yaml file.
+I therefore didn't add tests, and it would be the first thing to do as well as fixing the pre-commit checks.
 
-By default it runs:
-* black (formats your code);
-* mypy (validates types);
-* isort (sorts imports in all files);
-* flake8 (spots possibe bugs);
-* yesqa (removes useless `# noqa` comments).
+Note that I broke different functionalities into different services, so it would be possible to test many aspect to the route using dependency injection.
 
-
-You can read more about pre-commit here: https://pre-commit.com/
-
-
-## Running tests
-
-If you want to run it in docker, simply run:
-
-```bash
-docker-compose -f deploy/docker-compose.yml --project-directory . run --rm api pytest -vv .
-docker-compose -f deploy/docker-compose.yml --project-directory . down
-```
-
-For running tests on your local machine.
-
-
-2. Run the pytest.
-```bash
-pytest -vv .
-```
+One thing that bothers me is that the redis_pool is passed to the cache and limiter API and maybe passing the request would be a tiny bit better, but I couldn't find a way to get the app globally to get the redis_pool and all the docs I found was using the pattern of getting the pool from the request.app.
